@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
 import axios from "axios";
-import { getSupabase } from "@/lib/supabaseClient";
 
 const GENRE_OPTIONS = [
   "剧情","喜剧","动作","爱情","科幻","动画","悬疑","惊悚",
@@ -189,8 +188,11 @@ export default function AddMoviePage() {
         watch_date: form.watch_date || null,
       };
 
-      const supabase = getSupabase();
-      const { error } = await supabase.from("movies").insert([payload]);
+      const res = await fetch('/api/movies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
       if (error) {
         if (error.code === "23505") {
