@@ -17,7 +17,7 @@ export async function POST(request) {
     ]
 
     let html = null
-    let lastError = null
+    
 
     for (const target of proxies) {
       try {
@@ -73,7 +73,7 @@ export async function POST(request) {
   }
 }
 
-function parseDoubanHtml(html, url) {
+function parseDoubanHtml(html) {
   const result = { title: null, year: null, poster: null, genres: [], director: null, cast: null, douban_rating: null, overview: null }
 
   // 从 meta 标签提取
