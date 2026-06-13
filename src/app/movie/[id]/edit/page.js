@@ -56,6 +56,7 @@ export default function EditMoviePage() {
           })
         }
       } catch (err) {
+        console.error(err)
         toast.error('加载失败')
       } finally {
         setLoading(false)
