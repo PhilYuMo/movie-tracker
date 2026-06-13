@@ -79,7 +79,7 @@ export default function AddMoviePage() {
     mt = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i);
     if(mt) r.overview = mt[1].trim();
     return r;
-  } catch { return {}; }
+  } catch (e) { console.error(e); return {}; }
 }
 
   const handleAutoFill = async () => {
@@ -132,7 +132,7 @@ export default function AddMoviePage() {
             setAutoFilling(false);
             return;
           }
-        } catch {}
+        } catch (e) { console.error(e); }
       }
       toast.error(msg, { id: toastId });
     } finally {
@@ -204,7 +204,7 @@ export default function AddMoviePage() {
 
       toast.success("保存成功！", { id: toastId });
       setTimeout(() => router.push("/"), 800);
-    } catch {
+    } catch (e) { console.error(e)
       console.error("保存失败:", e);
       toast.error("保存失败，请稍后重试", { id: toastId });
       setLoading(false);

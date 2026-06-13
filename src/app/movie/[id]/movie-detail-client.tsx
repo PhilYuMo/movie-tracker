@@ -25,7 +25,7 @@ export default function MovieDetailClient({ movie }: { movie: Movie }) {
       }
       toast.success('已删除', { id: toastId })
       setTimeout(() => router.push('/'), 600)
-    } catch {
+    } catch (e) { console.error(e)
       toast.error('删除失败，请稍后重试', { id: toastId })
       setDeleting(false)
     }
@@ -59,7 +59,7 @@ export default function MovieDetailClient({ movie }: { movie: Movie }) {
           <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
             <div className="text-4xl mb-3">{String.fromCodePoint(0x26A0, 0xFE0F)}</div>
             <h3 className="text-lg font-semibold text-gray-800 mb-2">确认删除</h3>
-            <p className="text-sm text-gray-500 mb-6">确定要删除?{movie.title}?吗？此操作不可撤销。</p>
+            <p className="text-sm text-gray-500 mb-6">确定要删除「{movie.title}」吗？此操作不可撤销。</p>
             <div className="flex gap-3">
               <button onClick={() => setShowConfirm(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">取消</button>
               <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50">{deleting ? '删除中...' : '确认删除'}</button>
@@ -105,7 +105,7 @@ export default function MovieDetailClient({ movie }: { movie: Movie }) {
               {movie.watch_date && (
                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Calendar className="w-4 h-4" />
-                  <span>观看日期： {movie.watch_date}</span>
+                  <span>观看日期：{movie.watch_date}</span>
                 </div>
               )}
               {movie.douban_url && (
@@ -136,7 +136,7 @@ export default function MovieDetailClient({ movie }: { movie: Movie }) {
             {movie.created_at && (
               <div className="flex items-center gap-2 text-xs text-gray-400 pt-2 border-t border-gray-50">
                 <Clock className="w-3 h-3" />
-                <span>记录时间： {new Date(movie.created_at).toLocaleDateString('zh-CN')}</span>
+                <span>记录时间：{new Date(movie.created_at).toLocaleDateString('zh-CN')}</span>
               </div>
             )}
           </div>

@@ -29,4 +29,3 @@ export default async function MovieDetailPage({ params }: { params: { id: string
 
   return <MovieDetailClient movie={movie} />
 }
-
