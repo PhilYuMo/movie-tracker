@@ -1,5 +1,5 @@
 ﻿import { NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabaseClient'
+import { getSupabase } from '@/lib/supabaseClient'
 
 export async function DELETE(request, { params }) {
   try {
@@ -10,7 +10,7 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: '无效的 ID' }, { status: 400 })
     }
 
-    const supabase = createSupabaseServerClient()
+    const supabase = getSupabase()
     const { error } = await supabase.from('movies').delete().eq('id', id)
 
     if (error) {
