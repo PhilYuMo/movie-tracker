@@ -79,7 +79,7 @@ export default function AddMoviePage() {
     mt = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i);
     if(mt) r.overview = mt[1].trim();
     return r;
-  } catch(e) { return {}; }
+  } catch { return {}; }
 }
 
   const handleAutoFill = async () => {
