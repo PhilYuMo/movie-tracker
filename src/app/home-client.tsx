@@ -5,50 +5,41 @@ import { Search } from 'lucide-react'
 import Link from 'next/link'
 import type { Movie } from '@/types'
 
-const DECADES = ['2020年代', '2010年代', '2000年代', '1990年代', '1980年代及更早']
+const DECADES = ["2020年代", "2010年代", "2000年代", "1990年代", "1980年代及更早"];
 
 function getDecade(year: number | null) {
   if (!year) return null
-  if (year >= 2020) return '2020年代'
-  if (year >= 2010) return '2010年代'
-  if (year >= 2000) return '2000年代'
-  if (year >= 1990) return '1990年代'
-  return '1980年代及更早'
+  if (year >= 2020) return DECADES[0]
+  if (year >= 2010) return DECADES[1]
+  if (year >= 2000) return DECADES[2]
+  if (year >= 1990) return DECADES[3]
+  return DECADES[4]
 }
 
 function StarRating({ rating }: { rating: number | null }) {
   if (rating == null) return null
   const full = Math.floor(rating / 2)
-  const stars: string[] = []
+  const stars = []
   for (let i = 0; i < full; i++) stars.push('★')
   return <span className="text-yellow-400 text-sm tracking-tight">{stars.join('')}</span>
 }
 
 export default function HomeClient({ movies }: { movies: Movie[] }) {
-  const [activeGenre, setActiveGenre] = useState('全部')
-  const [activeDecade, setActiveDecade] = useState('全部')
+  const [activeGenre, setActiveGenre] = useState("全部")
+  const [activeDecade, setActiveDecade] = useState("全部")
   const [searchQuery, setSearchQuery] = useState('')
 
   const allGenres = useMemo(() => {
     const set = new Set<string>()
-    movies.forEach((m) => {
-      if (m.genres) m.genres.forEach((g) => set.add(g))
-    })
-    return ['全部', ...Array.from(set).sort()]
+    movies.forEach((m) => { if (m.genres) m.genres.forEach((g) => set.add(g)) })
+    return ["全部", ...Array.from(set).sort()]
   }, [movies])
 
   const filtered = useMemo(() => {
     let list = [...movies]
-    if (activeGenre !== '全部') {
-      list = list.filter((m) => m.genres && m.genres.includes(activeGenre))
-    }
-    if (activeDecade !== '全部') {
-      list = list.filter((m) => getDecade(m.year) === activeDecade)
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase()
-      list = list.filter((m) => m.title && m.title.toLowerCase().includes(q))
-    }
+    if (activeGenre !== "全部") { list = list.filter((m) => m.genres && m.genres.includes(activeGenre)) }
+    if (activeDecade !== "全部") { list = list.filter((m) => getDecade(m.year) === activeDecade) }
+    if (searchQuery.trim()) { const q = searchQuery.trim().toLowerCase(); list = list.filter((m) => m.title && m.title.toLowerCase().includes(q)) }
     return list
   }, [movies, activeGenre, activeDecade, searchQuery])
 
@@ -57,13 +48,7 @@ export default function HomeClient({ movies }: { movies: Movie[] }) {
       <div className="mb-6">
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索片名..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6b6b]/30 focus:border-[#ff6b6b] bg-white"
-          />
+          <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="搜索片名..." className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6b6b]/30 focus:border-[#ff6b6b] bg-white" />
         </div>
       </div>
 
@@ -72,14 +57,8 @@ export default function HomeClient({ movies }: { movies: Movie[] }) {
           <span className="text-xs text-gray-400 font-medium w-10">类型</span>
           <div className="flex flex-wrap gap-1.5">
             {allGenres.map((genre) => (
-              <button
-                key={genre}
-                onClick={() => setActiveGenre(genre)}
-                className={
-                  activeGenre === genre
-                    ? 'bg-[#ff6b6b] text-white px-3 py-1 rounded-full text-xs font-medium transition-all'
-                    : 'bg-white text-gray-500 px-3 py-1 rounded-full text-xs font-medium border border-gray-200 hover:border-[#ff6b6b] hover:text-[#ff6b6b] transition-all'
-                }
+              <button key={genre} onClick={() => setActiveGenre(genre)}
+                className={activeGenre === genre ? 'bg-[#ff6b6b] text-white px-3 py-1 rounded-full text-xs font-medium transition-all' : 'bg-white text-gray-500 px-3 py-1 rounded-full text-xs font-medium border border-gray-200 hover:border-[#ff6b6b] hover:text-[#ff6b6b] transition-all'}
               >
                 {genre}
               </button>
@@ -89,25 +68,12 @@ export default function HomeClient({ movies }: { movies: Movie[] }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-gray-400 font-medium w-10">年代</span>
           <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => setActiveDecade('全部')}
-              className={
-                activeDecade === '全部'
-                  ? 'bg-[#ff6b6b] text-white px-3 py-1 rounded-full text-xs font-medium transition-all'
-                  : 'bg-white text-gray-500 px-3 py-1 rounded-full text-xs font-medium border border-gray-200 hover:border-[#ff6b6b] hover:text-[#ff6b6b] transition-all'
-              }
-            >
-              全部
-            </button>
+            <button onClick={() => setActiveDecade("全部")}
+              className={activeDecade === "全部" ? 'bg-[#ff6b6b] text-white px-3 py-1 rounded-full text-xs font-medium transition-all' : 'bg-white text-gray-500 px-3 py-1 rounded-full text-xs font-medium border border-gray-200 hover:border-[#ff6b6b] hover:text-[#ff6b6b] transition-all'}
+            >全部</button>
             {DECADES.map((decade) => (
-              <button
-                key={decade}
-                onClick={() => setActiveDecade(decade)}
-                className={
-                  activeDecade === decade
-                    ? 'bg-[#ff6b6b] text-white px-3 py-1 rounded-full text-xs font-medium transition-all'
-                    : 'bg-white text-gray-500 px-3 py-1 rounded-full text-xs font-medium border border-gray-200 hover:border-[#ff6b6b] hover:text-[#ff6b6b] transition-all'
-                }
+              <button key={decade} onClick={() => setActiveDecade(decade)}
+                className={activeDecade === decade ? 'bg-[#ff6b6b] text-white px-3 py-1 rounded-full text-xs font-medium transition-all' : 'bg-white text-gray-500 px-3 py-1 rounded-full text-xs font-medium border border-gray-200 hover:border-[#ff6b6b] hover:text-[#ff6b6b] transition-all'}
               >
                 {decade}
               </button>
@@ -125,27 +91,20 @@ export default function HomeClient({ movies }: { movies: Movie[] }) {
         <div className="text-center py-20">
           <div className="text-6xl mb-4">{String.fromCodePoint(0x1F3AC)}</div>
           <p className="text-gray-400 text-sm">
-            {movies.length === 0
-              ? '还没有电影，去添加一部吧'
-              : '没有匹配的电影'}
+            {movies.length === 0 ? "还没有电影，去添加一部吧" : "没有匹配的电影"}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
           {filtered.map((movie, index) => (
-            <div key={movie.id}>
+            <div key={movie.id} className="relative">
               <Link href={'/movie/' + movie.id} className="group block bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden">
                 <div className="absolute top-2 left-2 z-10 w-7 h-7 bg-[#ff6b6b] text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md">
                   #{index + 1}
                 </div>
                 <div className="aspect-[2/3] bg-gray-100 overflow-hidden">
                   {movie.poster ? (
-                    <img
-                      src={movie.poster}
-                      alt={movie.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      loading="lazy"
-                    />
+                    <img src={movie.poster} alt={movie.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-300">
                       <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">

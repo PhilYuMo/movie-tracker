@@ -49,26 +49,54 @@ export default function AddMoviePage() {
     });
   };
 
+
+  // 浏览器端豆瓣解析（当服务端被屏蔽时的备用方案）
+  const clientParseDouban = async (doubanUrl) => {
+  try {
+    var proxyUrl = 'https://api.allorigins.win/raw?url='+encodeURIComponent(doubanUrl);
+    var res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    if(!res.ok) return {};
+    var html = await res.text();
+    var r = {};
+    var quotes = String.fromCharCode(0x22,0x27);
+    var re = new RegExp("<meta\\s+property=["+quotes+"]og:title["+quotes+"]\\s+content=["+quotes+"]([^"+quotes+"]+)["+quotes+"]/i");
+    var mt = html.match(re);
+    if(mt) r.title = mt[1].trim();
+    mt = html.match(/<meta\s+property=["']og:video:release_date["']\s+content=["'](\d{4})/i);
+    if(mt) r.year = parseInt(mt[1]);
+    mt = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+    if(mt) r.poster = mt[1].trim();
+    mt = html.match(/<strong\s+class="ll\s+rating_num"[^>]*>([^<]+)</i);
+    if(mt) r.douban_rating = parseFloat(mt[1].trim());
+    mt = html.match(/\u5bfc\u6f14[^<]*<a[^>]*>([^<]+)</i);
+    if(mt) r.director = mt[1].trim();
+    var genres = [];
+    var gRe = /<span\s+property="v:genre">([^<]+)<\/span>/gi;
+    var g; while((g=gRe.exec(html))!==null) genres.push(g[1].trim());
+    if(genres.length) r.genres = genres;
+    var casts = [...html.matchAll(/<a\s+(?:[^>]*\s+)?rel="v:starring"[^>]*>([^<]+)<\/a>/gi)];
+    if(casts.length) r.cast = casts.slice(0,5).map(function(mb){return mb[1].trim();}).join(' / ');
+    mt = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i);
+    if(mt) r.overview = mt[1].trim();
+    return r;
+  } catch(e) { return {}; }
+}
+
   const handleAutoFill = async () => {
     const url = form.douban_url?.trim();
     if (!url) {
       toast.error("请先粘贴豆瓣链接");
       return;
     }
-
     setAutoFilling(true);
     const toastId = toast.loading("正在解析豆瓣页面...");
-
     try {
       const res = await axios.post("/api/parse-douban", { url });
       const data = res.data.data;
-
       if (!data.title) {
         toast.error("解析失败，请检查链接是否正确", { id: toastId });
-        setAutoFilling(false);
         return;
       }
-
       setForm((prev) => ({
         ...prev,
         title: data.title || prev.title,
@@ -81,10 +109,31 @@ export default function AddMoviePage() {
         overview: data.overview || prev.overview,
         douban_url: url,
       }));
-
       toast.success("自动填充完成，请确认信息", { id: toastId });
     } catch (err) {
-      const msg = err.response?.data?.error || "解析失败，请稍后重试";
+      const data = err.response?.data;
+      const msg = data?.error || "解析失败，请稍后重试";
+      if (data?.needClientParse) {
+        try {
+          const cr = await clientParseDouban(form.douban_url);
+          if (cr && cr.title) {
+            setForm((prev) => ({
+              ...prev,
+              title: cr.title || prev.title,
+              year: cr.year ? String(cr.year) : prev.year,
+              poster: cr.poster || prev.poster,
+              genres: cr.genres?.length ? cr.genres : prev.genres,
+              director: cr.director || prev.director,
+              cast: cr.cast || prev.cast,
+              douban_rating: cr.douban_rating != null ? String(cr.douban_rating) : prev.douban_rating,
+              overview: cr.overview || prev.overview,
+            }));
+            toast.success("自动填充完成，请确认信息", { id: toastId });
+            setAutoFilling(false);
+            return;
+          }
+        } catch (e) {}
+      }
       toast.error(msg, { id: toastId });
     } finally {
       setAutoFilling(false);
@@ -102,7 +151,7 @@ export default function AddMoviePage() {
       return false;
     }
     if (form.poster && !/^https?:\/\//.test(form.poster)) {
-      toast.error("海报链接格式不正确（需以 http:// 或 https:// 开头）");
+      toast.error("海报链接格式不正确");
       return false;
     }
     const ratingNum = parseFloat(form.rating);
@@ -113,10 +162,6 @@ export default function AddMoviePage() {
     const doubanNum = parseFloat(form.douban_rating);
     if (form.douban_rating && (isNaN(doubanNum) || doubanNum < 0 || doubanNum > 10)) {
       toast.error("豆瓣评分应在 0-10 之间");
-      return false;
-    }
-    if (form.douban_url && !/^https?:\/\/movie\.douban\.com\/subject\/\d+/.test(form.douban_url)) {
-      toast.error("豆瓣链接格式不正确");
       return false;
     }
     return true;
@@ -144,7 +189,8 @@ export default function AddMoviePage() {
         watch_date: form.watch_date || null,
       };
 
-      const { error } = await getSupabase().from("movies").insert([payload]);
+      const supabase = getSupabase();
+      const { error } = await supabase.from("movies").insert([payload]);
 
       if (error) {
         if (error.code === "23505") {
@@ -156,9 +202,10 @@ export default function AddMoviePage() {
         return;
       }
 
-      toast.success("添加成功！", { id: toastId });
+      toast.success("保存成功！", { id: toastId });
       setTimeout(() => router.push("/"), 800);
-    } catch {
+    } catch (e) {
+      console.error("保存失败:", e);
       toast.error("保存失败，请稍后重试", { id: toastId });
       setLoading(false);
     }
@@ -169,8 +216,8 @@ export default function AddMoviePage() {
       <Toaster position="top-center" />
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">添加电影</h1>
-
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* 豆瓣链接 */}
           <div className="flex gap-3 items-end">
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -193,9 +240,9 @@ export default function AddMoviePage() {
               {autoFilling ? "解析中..." : "自动填充"}
             </button>
           </div>
-
           <hr className="border-gray-200" />
 
+          {/* 片名 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               片名 <span className="text-red-500">*</span>
@@ -232,6 +279,7 @@ export default function AddMoviePage() {
             </div>
           </div>
 
+          {/* 类型 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">类型</label>
             <div className="flex flex-wrap gap-2">
@@ -345,5 +393,3 @@ export default function AddMoviePage() {
     </main>
   );
 }
-
-

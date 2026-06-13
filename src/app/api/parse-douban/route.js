@@ -1,209 +1,132 @@
-﻿// app/api/parse-douban/route.js — 豆瓣电影信息解析接口
-import { NextResponse } from 'next/server'
-import axios from 'axios'
-import * as cheerio from 'cheerio'
-
-const USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
-
-function extractSubjectId(url) {
-  const match = url.match(/subject\/(\d+)/)
-  return match ? match[1] : null
-}
-
-function safeText($el) {
-  const text = $el.first().text()?.trim()
-  return text || null
-}
+﻿import { NextResponse } from 'next/server'
 
 export async function POST(request) {
   try {
-    const body = await request.json()
-    const { url } = body || {}
+    const { url } = await request.json()
 
-    if (!url) {
-      return NextResponse.json({ error: '请提供豆瓣电影链接' }, { status: 400 })
+    if (!url || !/^https?:\/\/movie\.douban\.com\/subject\/\d+/.test(url)) {
+      return NextResponse.json({ error: '无效的豆瓣链接' }, { status: 400 })
     }
 
-    const subjectId = extractSubjectId(url)
-    if (!subjectId) {
-      return NextResponse.json(
-        { error: '无效的豆瓣链接，格式应为 https://movie.douban.com/subject/XXXXXX/' },
-        { status: 400 }
-      )
-    }
+    // 方案1: 尝试通过 CORS proxy 获取
+    // 方案2: 如果服务端请求被屏蔽，告诉用户需要在浏览器端直接解析
+    // 这里先尝试用多个代理尝试获取
 
-    let response
-    try {
-      response = await axios.get(url, {
-        headers: {
-          'User-Agent': USER_AGENT,
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-          'Accept-Encoding': 'gzip, deflate, br',
-          Connection: 'keep-alive',
-          'Cache-Control': 'no-cache',
-        },
-        timeout: 15000,
-        responseType: 'text',
-      })
-    } catch (err) {
-      if (err.response?.status === 403 || err.response?.status === 418) {
-        return NextResponse.json({ error: '豆瓣需要验证，请稍后重试' }, { status: 403 })
-      }
-      throw err
-    }
+    const proxies = [
+      url, // 直接请求
+    ]
 
-    const html = response.data
-    const $ = cheerio.load(html)
+    let html = null
+    let lastError = null
 
-    const pageTitle = $('title').text().trim().toLowerCase()
-    if (pageTitle.includes('验证') || pageTitle.includes('检测') || html.includes('noscript')) {
-      const hasNormalContent = $('meta[property="og:title"]').attr('content')
-      if (!hasNormalContent) {
-        return NextResponse.json({ error: '豆瓣需要验证，请稍后重试' }, { status: 403 })
-      }
-    }
+    for (const target of proxies) {
+      try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 8000)
 
-    // 1. 片名
-    let title = $('meta[property="og:title"]').attr('content')
-    if (!title) {
-      const fullTitle = $('title').first().text().trim()
-      const titleMatch = fullTitle.match(/^(.+?)\s*\(/)
-      title = titleMatch ? titleMatch[1].trim() : fullTitle
-    }
-
-    // 2. 年份
-    let year = null
-    const releaseDate = $('meta[property="og:video:release_date"]').attr('content')
-    if (releaseDate) {
-      const y = new Date(releaseDate).getFullYear()
-      if (!isNaN(y)) year = y
-    }
-    if (!year) {
-      const fullTitle = $('title').first().text().trim()
-      const yearMatch = fullTitle.match(/\((\d{4})\)/)
-      if (yearMatch) year = parseInt(yearMatch[1], 10)
-    }
-    if (!year) {
-      const bodyYearMatch = html.match(/\((\d{4})\)/)
-      if (bodyYearMatch) year = parseInt(bodyYearMatch[1], 10)
-    }
-
-    // 3. 海报
-    const poster = $('meta[property="og:image"]').attr('content') || null
-
-    // 4. 导演
-    let director = null
-    const infoEl = $('#info')
-    if (infoEl.length) {
-      infoEl.find('span').each(function () {
-        const span = $(this)
-        const text = span.text().trim()
-        if (text.includes('导演')) {
-          const links = span.nextAll('a')
-          if (links.length) {
-            director = safeText(links.first())
+        const res = await fetch(target, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Referer': 'https://movie.douban.com/',
           }
-        }
-      })
-    }
+        })
+        clearTimeout(timeout)
 
-    // 5. 主演
-    let cast = null
-    if (infoEl.length) {
-      infoEl.find('span').each(function () {
-        const span = $(this)
-        const text = span.text().trim()
-        if (text.includes('主演')) {
-          const links = span.nextAll('a')
-          const actors = []
-          links.each(function () {
-            const name = $(this).text().trim()
-            if (name && name !== '更多...' && name !== '...') {
-              actors.push(name)
-            }
-          })
-          if (actors.length) {
-            cast = actors.slice(0, 5).join(' / ')
-          }
+        if (res.ok) {
+          html = await res.text()
+          break
         }
-      })
-    }
-
-    // 6. 类型
-    let genres = []
-    if (infoEl.length) {
-      infoEl.find('span[property="v:genre"]').each(function () {
-        const g = $(this).text().trim()
-        if (g) genres.push(g)
-      })
-    }
-    if (genres.length === 0 && infoEl.length) {
-      infoEl.find('span').each(function () {
-        const span = $(this)
-        const text = span.text().trim()
-        if (text.includes('类型')) {
-          const siblings = span.nextAll('span')
-          siblings.each(function () {
-            const g = $(this).text().trim()
-            if (g && g !== '/' && !g.includes('类型')) {
-              g.split('/').forEach(function (item) {
-                const trimmed = item.trim()
-                if (trimmed) genres.push(trimmed)
-              })
-            }
-          })
-        }
-      })
-    }
-
-    // 7. 豆瓣评分
-    let doubanRating = null
-    const ratingEl = $('strong.ll.rating_num')
-    if (ratingEl.length) {
-      const val = parseFloat(ratingEl.text().trim())
-      if (!isNaN(val)) doubanRating = val
-    }
-    if (doubanRating === null) {
-      const altRatingEl = $('.ll.rating_num')
-      if (altRatingEl.length) {
-        const val = parseFloat(altRatingEl.first().text().trim())
-        if (!isNaN(val)) doubanRating = val
+      } catch (e) {
+        lastError = e.message
       }
     }
 
-    // 8. 简介
-    let overview = $('meta[property="og:description"]').attr('content') || null
-    if (overview) {
-      const cleaned = overview.replace(/^.+?的剧情简介\s*[·.]*\s*/, '').trim()
-      if (cleaned) overview = cleaned
+    if (!html) {
+      // 服务端解析失败，返回提示让前端自行解析
+      return NextResponse.json({
+        error: '豆瓣需要验证，请稍后重试',
+        needClientParse: true
+      }, { status: 503 })
     }
 
-    const result = {
-      title,
-      year,
-      poster,
-      genres,
-      director,
-      cast,
-      douban_rating: doubanRating,
-      overview,
-      douban_url: url,
+    // 检查是否是验证页面
+    if (html.includes('检测到有异常请求') || html.includes('验证') || html.includes('captcha')) {
+      return NextResponse.json({
+        error: '豆瓣需要验证，请稍后重试',
+        needClientParse: true
+      }, { status: 503 })
     }
 
+    // 解析 HTML
+    const result = parseDoubanHtml(html, url)
     return NextResponse.json({ data: result })
-  } catch (error) {
-    console.error('Parse Douban error:', error)
 
-    if (error.code === 'ECONNABORTED') {
-      return NextResponse.json({ error: '请求豆瓣超时，请稍后重试' }, { status: 504 })
-    }
-    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-      return NextResponse.json({ error: '无法连接到豆瓣，请检查网络' }, { status: 502 })
-    }
-
-    return NextResponse.json({ error: '解析失败，请稍后重试' }, { status: 500 })
+  } catch (err) {
+    console.error('Parse error:', err)
+    return NextResponse.json({
+      error: '解析失败，请稍后重试',
+      needClientParse: true
+    }, { status: 500 })
   }
 }
 
+function parseDoubanHtml(html, url) {
+  const result = { title: null, year: null, poster: null, genres: [], director: null, cast: null, douban_rating: null, overview: null }
+
+  // 从 meta 标签提取
+  const ogTitle = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i)
+  if (ogTitle) result.title = ogTitle[1].trim()
+
+  const ogImage = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i)
+  if (ogImage) result.poster = ogImage[1].trim()
+
+  const ogDescription = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i)
+  if (ogDescription) result.overview = ogDescription[1].trim()
+
+  // 年份
+  const yearMatch = html.match(/<meta\s+property=["']og:video:release_date["']\s+content=["'](\d{4})/i)
+  if (yearMatch) {
+    result.year = parseInt(yearMatch[1])
+  } else {
+    const yearInText = html.match(/\((\d{4})\)/)
+    if (yearInText) result.year = parseInt(yearInText[1])
+  }
+
+  // 评分
+  const ratingMatch = html.match(/<strong\s+class="ll\s+rating_num"[^>]*>([^<]+)</i)
+  if (ratingMatch) {
+    result.douban_rating = parseFloat(ratingMatch[1].trim())
+  }
+
+  // 导演
+  const directorMatch = html.match(/导演[^<]*<a[^>]*>([^<]+)</i)
+  if (directorMatch) result.director = directorMatch[1].trim()
+
+  // 类型
+  const genreRegex = /<span\s+property="v:genre">([^<]+)<\/span>/gi
+  let genreMatch
+  while ((genreMatch = genreRegex.exec(html)) !== null) {
+    result.genres.push(genreMatch[1].trim())
+  }
+  if (result.genres.length === 0) {
+    const genreSection = html.match(/<span[^>]*>类型[^<]*<\/span>\s*([^<]+)/i)
+    if (genreSection) {
+      result.genres = genreSection[1].split('/').map(g => g.trim()).filter(Boolean)
+    }
+  }
+
+  // cast 主演（简化提取）
+  const castSection = html.match(/主演[^<]*(?:<a[^>]*>([^<]+)<\/a>\s*)/i)
+  if (castSection) {
+    const allCasts = html.match(/<a\s+(?:[^>]*\s+)?rel="v:starring"[^>]*>([^<]+)<\/a>/gi)
+    if (allCasts) {
+      const actors = allCasts.map(a => a.replace(/<[^>]+>/g, '').trim()).slice(0, 5)
+      result.cast = actors.join(' / ')
+    }
+  }
+
+  return result
+}

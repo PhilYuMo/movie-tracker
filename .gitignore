@@ -1,5 +1,15 @@
-﻿node_modules/
-.next/
-.env.local
-*.tsbuildinfo
-next-env.d.ts
+# dependencies 
+/node_modules 
+/.next/ 
+.env*.local 
+*.tsbuildinfo 
+next-env.d.ts 
+.planning 
+fix-*.js 
+verify*.js 
+check*.js 
+uc.js 
+gen-*.js 
+write-*.js 
+out.txt 
+python-installer.exe 
