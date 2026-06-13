@@ -132,7 +132,7 @@ export default function AddMoviePage() {
             setAutoFilling(false);
             return;
           }
-        } catch (e) {}
+        } catch {}
       }
       toast.error(msg, { id: toastId });
     } finally {
@@ -204,7 +204,7 @@ export default function AddMoviePage() {
 
       toast.success("保存成功！", { id: toastId });
       setTimeout(() => router.push("/"), 800);
-    } catch (e) {
+    } catch {
       console.error("保存失败:", e);
       toast.error("保存失败，请稍后重试", { id: toastId });
       setLoading(false);
